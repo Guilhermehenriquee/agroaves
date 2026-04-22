@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: agroaves
+    runtime: node
+    plan: starter
+    autoDeployTrigger: commit
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: VITE_API_BASE
+        value: /api
+      - key: AGROAVES_DATA_DIR
+        value: /var/data/agroaves
+      - key: AGROAVES_ENABLE_DIRECT_PRINT
+        value: "false"
+    disk:
+      name: agroaves-data
+      mountPath: /var/data
+      sizeGB: 1
