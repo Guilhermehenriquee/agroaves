@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, MessageSquare, Plus, SendHorizontal } from "lucide-react";
 import { api } from "../api/service.js";
 import { Badge, Btn, Card, ErrorCard, Input, LoadingCard, Modal, SectionHeader, Select, Table, Td, TextArea } from "../components/ui.jsx";
-import { C, MESSAGE_CHANNEL_LABELS, fmtDate, CAT_LABELS } from "../lib/designSystem.js";
+import { C, MESSAGE_CHANNEL_LABELS, categoryLabel, fmtDate } from "../lib/designSystem.js";
 
 const EMPTY_TEMPLATE = {
   productId: "",
@@ -262,7 +262,7 @@ export function MessagesPage() {
           rows={templates.map((template) => [
             <Td key="product">
               <div style={{ fontWeight: 600 }}>{template.product}</div>
-              <div style={{ fontSize: 11, color: C.textSec }}>{template.brand} · {CAT_LABELS[template.category]}</div>
+              <div style={{ fontSize: 11, color: C.textSec }}>{template.brand} · {categoryLabel(template.category)}</div>
             </Td>,
             <Td key="channel"><Badge label={MESSAGE_CHANNEL_LABELS[template.channel] ?? template.channel} bg={C.infoBg} text={C.info} /></Td>,
             <Td key="status"><Badge label={template.active ? "Ativa" : "Inativa"} bg={template.active ? C.successBg : C.warningBg} text={template.active ? C.success : C.warning} /></Td>,

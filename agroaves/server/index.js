@@ -310,6 +310,17 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
+      if (pathname === "/api/fiscal/issuer" && request.method === "GET") {
+        sendJson(response, 200, { issuer: store.getFiscalIssuer(user.storeId) });
+        return;
+      }
+
+      if (pathname === "/api/fiscal/issuer/save" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, { issuer: store.saveFiscalIssuer(user.storeId, body) });
+        return;
+      }
+
       if (pathname === "/api/fiscal/settings" && request.method === "GET") {
         sendJson(response, 200, await store.getFiscalPrintSettings(user.storeId));
         return;
@@ -361,6 +372,12 @@ const server = http.createServer(async (request, response) => {
       if (pathname === "/api/sales" && request.method === "POST") {
         const body = await readJsonBody(request);
         sendJson(response, 201, { sale: await store.createSale(user.storeId, body) });
+        return;
+      }
+
+      const saleDeleteParams = routeMatch(pathname, "/api/sales/:id/delete");
+      if (saleDeleteParams && request.method === "POST") {
+        sendJson(response, 200, store.deleteSale(user.storeId, Number(saleDeleteParams.id)));
         return;
       }
 

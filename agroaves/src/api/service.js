@@ -102,6 +102,12 @@ export const api = {
   getFiscalDocument(id) {
     return request(`/fiscal/${id}`);
   },
+  getFiscalIssuer() {
+    return request("/fiscal/issuer");
+  },
+  saveFiscalIssuer(payload) {
+    return request("/fiscal/issuer/save", { method: "POST", body: payload });
+  },
   getFiscalPrintSettings() {
     return request("/fiscal/settings");
   },
@@ -123,5 +129,8 @@ export const api = {
   },
   createSale(payload) {
     return request("/sales", { method: "POST", body: payload });
+  },
+  deleteSale(id) {
+    return request(`/sales/${id}/delete`, { method: "POST" });
   },
 };

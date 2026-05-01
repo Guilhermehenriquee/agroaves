@@ -93,7 +93,7 @@ function AppShell() {
       case "mensagens":
         return <MessagesPage />;
       case "fiscal":
-        return <FiscalPage />;
+        return <FiscalPage onDataChanged={refreshHeader} />;
       default:
         return <DashboardPage onNavigate={setPage} />;
     }

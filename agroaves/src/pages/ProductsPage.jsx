@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Edit2, Plus, Trash2 } from "lucide-react";
 import { api } from "../api/service.js";
 import { Badge, Btn, Card, ErrorCard, Input, LoadingCard, Modal, SearchField, SectionHeader, Select, Table, Td } from "../components/ui.jsx";
-import { CAT_LABELS, C, catColor, daysUntil, fmt, fmtDate, fmtQty } from "../lib/designSystem.js";
+import { CAT_LABELS, C, catColor, categoryLabel, daysUntil, fmt, fmtDate, fmtQty } from "../lib/designSystem.js";
 
 const EMPTY_FORM = {
   name: "",
@@ -20,6 +20,16 @@ const EMPTY_FORM = {
   barcode: "",
 };
 
+function normalizeCategory(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function ProductsPage({ onDataChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,6 +37,7 @@ export function ProductsPage({ onDataChanged }) {
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const [categoryDraft, setCategoryDraft] = useState("");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -58,14 +69,29 @@ export function ProductsPage({ onDataChanged }) {
     });
   }, [category, products, search]);
 
+  const categoryOptions = useMemo(() => {
+    const values = new Set(["all", ...Object.keys(CAT_LABELS)]);
+    for (const product of products) {
+      if (product.cat) {
+        values.add(product.cat);
+      }
+    }
+    if (form.cat) {
+      values.add(form.cat);
+    }
+    return [...values];
+  }, [form.cat, products]);
+
   function openAdd() {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setCategoryDraft("");
     setModal(true);
   }
 
   function openEdit(product) {
     setEditing(product.id);
+    setCategoryDraft("");
     setForm({
       ...product,
       price: product.price,
@@ -82,6 +108,17 @@ export function ProductsPage({ onDataChanged }) {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function addCategory() {
+    const normalized = normalizeCategory(categoryDraft);
+    if (!normalized) {
+      return;
+    }
+
+    updateForm("cat", normalized);
+    setCategory(normalized);
+    setCategoryDraft("");
   }
 
   async function saveProduct() {
@@ -124,7 +161,7 @@ export function ProductsPage({ onDataChanged }) {
         <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           <SearchField value={search} onChange={setSearch} placeholder="Buscar produto, marca ou codigo..." />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {["all", "racoes", "medicamentos", "aves", "utensilios"].map((current) => (
+            {categoryOptions.map((current) => (
               <button
                 key={current}
                 onClick={() => setCategory(current)}
@@ -139,7 +176,7 @@ export function ProductsPage({ onDataChanged }) {
                   cursor: "pointer",
                 }}
               >
-                {current === "all" ? "Todos" : CAT_LABELS[current]}
+                {current === "all" ? "Todos" : categoryLabel(current)}
               </button>
             ))}
           </div>
@@ -160,7 +197,7 @@ export function ProductsPage({ onDataChanged }) {
                 </div>
               </Td>,
               <Td key="category">
-                <Badge label={CAT_LABELS[product.cat]} bg={categoryStyle.bg} text={categoryStyle.text} />
+                <Badge label={categoryLabel(product.cat)} bg={categoryStyle.bg} text={categoryStyle.text} />
               </Td>,
               <Td key="price">
                 <div>{fmt(product.price)}</div>
@@ -207,11 +244,18 @@ export function ProductsPage({ onDataChanged }) {
             <Input label="Nome do Produto *" value={form.name} onChange={(event) => updateForm("name", event.target.value)} />
           </div>
           <Select label="Categoria *" value={form.cat} onChange={(event) => updateForm("cat", event.target.value)}>
-            <option value="racoes">Racoes</option>
-            <option value="medicamentos">Medicamentos</option>
-            <option value="aves">Aves</option>
-            <option value="utensilios">Utensilios</option>
+            {categoryOptions.filter((current) => current !== "all").map((current) => (
+              <option key={current} value={current}>
+                {categoryLabel(current)}
+              </option>
+            ))}
           </Select>
+          <div>
+            <Input label="Nova categoria" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} placeholder="Ex: veneno" />
+            <Btn variant="outline" size="sm" icon={Plus} onClick={addCategory} style={{ width: "100%", marginTop: -6 }}>
+              Adicionar Categoria
+            </Btn>
+          </div>
           <Input label="Marca *" value={form.brand} onChange={(event) => updateForm("brand", event.target.value)} />
           <Select label="Tipo de venda *" value={form.saleMode} onChange={(event) => updateForm("saleMode", event.target.value)}>
             <option value="unit">Padrao</option>

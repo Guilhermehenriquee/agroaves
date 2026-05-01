@@ -16,6 +16,7 @@ function fmtCurrency(value) {
 
 function fmtDateTime(value) {
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
@@ -37,7 +38,7 @@ function buildItemsRows(document) {
     .join("");
 }
 
-function buildPrintHtml(document) {
+function buildPrintHtml(document, { autoPrint = true } = {}) {
   return `<!doctype html>
   <html lang="pt-BR">
     <head>
@@ -56,13 +57,17 @@ function buildPrintHtml(document) {
         th { text-align: left; }
         .totals .row { font-size: 12px; }
         .total-row { font-size: 14px; font-weight: 700; }
+        .screen-actions { display: flex; justify-content: center; padding: 10px; }
+        .screen-actions button { border: 1px solid #ddd; border-radius: 8px; background: #111; color: #fff; padding: 8px 14px; cursor: pointer; font-family: Arial, sans-serif; }
         @media print {
           body { margin: 0; }
           .page { width: auto; margin: 0; }
+          .screen-actions { display: none; }
         }
       </style>
     </head>
     <body>
+      ${autoPrint ? "" : '<div class="screen-actions"><button onclick="window.print()">Imprimir comprovante</button></div>'}
       <div class="page">
         <div class="center">
           <div class="strong">${escapeHtml(document.issuer.name)}</div>
@@ -115,19 +120,19 @@ function buildPrintHtml(document) {
           <div class="muted">${escapeHtml(document.legalNotice)}</div>
         </div>
       </div>
-      <script>
+      ${autoPrint ? `<script>
         window.onload = function () {
           setTimeout(function () {
             window.focus();
             window.print();
           }, 250);
         };
-      </script>
+      </script>` : ""}
     </body>
   </html>`;
 }
 
-export function openFiscalPrint(document, existingWindow = null) {
+export function openFiscalPrint(document, existingWindow = null, options = {}) {
   const printWindow = existingWindow && !existingWindow.closed
     ? existingWindow
     : window.open("", "_blank", "width=480,height=760");
@@ -137,7 +142,7 @@ export function openFiscalPrint(document, existingWindow = null) {
   }
 
   printWindow.document.open();
-  printWindow.document.write(buildPrintHtml(document));
+  printWindow.document.write(buildPrintHtml(document, options));
   printWindow.document.close();
   return true;
 }

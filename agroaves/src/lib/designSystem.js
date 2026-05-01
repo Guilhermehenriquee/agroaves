@@ -22,6 +22,8 @@ export const C = {
   infoBg: "#e0f2fe",
 };
 
+const BRASILIA_TIME_ZONE = "America/Sao_Paulo";
+
 export const shadow = "0 1px 3px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04)";
 export const shadowMd = "0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)";
 
@@ -31,6 +33,16 @@ export const CAT_LABELS = {
   aves: "Aves",
   utensilios: "Utensilios",
 };
+
+export function categoryLabel(value) {
+  if (!value) {
+    return "Sem categoria";
+  }
+
+  return CAT_LABELS[value] ?? String(value)
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export const PAYMENT_LABELS = {
   dinheiro: "Dinheiro",
@@ -69,7 +81,12 @@ export function fmtDate(value) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
+  const source = String(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(source) ? new Date(`${source}T12:00:00`) : new Date(value);
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRASILIA_TIME_ZONE,
+  }).format(date);
 }
 
 export function fmtTime(value) {
@@ -78,8 +95,21 @@ export function fmtTime(value) {
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRASILIA_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
+  }).format(new Date(value));
+}
+
+export function fmtDateTime(value) {
+  if (!value) {
+    return "â€”";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRASILIA_TIME_ZONE,
+    dateStyle: "short",
+    timeStyle: "short",
   }).format(new Date(value));
 }
 

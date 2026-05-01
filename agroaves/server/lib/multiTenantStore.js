@@ -3,11 +3,11 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   addDays,
+  brasiliaDateKey,
   buildMonthDates,
   buildWindowDates,
   categoryLabel,
   clampNumber,
-  dateOnly,
   daysUntil,
   formatDatePt,
   formatTimePt,
@@ -204,9 +204,9 @@ function calculateMeta(position, period) {
 function buildChartSeries(facts, period) {
   if (period === "week") {
     return buildWindowDates(7).map((date, index) => {
-      const key = dateOnly(date.toISOString());
+      const key = brasiliaDateKey(date);
       const total = facts
-        .filter((item) => dateOnly(item.createdAt) === key)
+        .filter((item) => brasiliaDateKey(item.createdAt) === key)
         .reduce((sum, item) => sum + item.lineTotal, 0);
 
       return {
@@ -980,6 +980,42 @@ function createStore() {
     };
   }
 
+  function getFiscalIssuer(storeId) {
+    const storeRecord = getStoreRecordById(storeId);
+    if (!storeRecord) {
+      throw new Error("Loja nao encontrada para editar a nota fiscal.");
+    }
+
+    return mapIssuer(storeRecord);
+  }
+
+  function saveFiscalIssuer(storeId, payload) {
+    const storeRecord = getStoreRecordById(storeId);
+    if (!storeRecord) {
+      throw new Error("Loja nao encontrada para editar a nota fiscal.");
+    }
+
+    const name = safeTrim(payload.name);
+    if (!name) {
+      throw new Error("Nome da empresa e obrigatorio.");
+    }
+
+    authDb.prepare(`
+      UPDATE stores
+      SET name = ?, cnpj = ?, ie = ?, address = ?, city = ?
+      WHERE id = ?
+    `).run(
+      name,
+      safeTrim(payload.cnpj),
+      safeTrim(payload.ie),
+      safeTrim(payload.address),
+      safeTrim(payload.city),
+      storeRecord.id,
+    );
+
+    return getFiscalIssuer(storeId);
+  }
+
   function getProductById(storeId, id) {
     const { db } = getStoreContext(storeId);
     const row = db.prepare(`
@@ -1478,9 +1514,10 @@ function createStore() {
     const saleMode = payload.saleMode === "weight" ? "weight" : "unit";
     const weightUnit = saleMode === "weight" ? (safeTrim(payload.weightUnit) || safeTrim(payload.unit) || "kg") : null;
     const unit = saleMode === "weight" ? weightUnit : (safeTrim(payload.unit) || "unidade");
+    const category = safeTrim(payload.cat) || "outros";
     const fields = [
       name,
-      payload.cat,
+      category,
       brand,
       toNumber(payload.price),
       toNumber(payload.cost),
@@ -1619,8 +1656,8 @@ function createStore() {
     const products = listProducts(storeId);
     const clients = listClients(storeId);
     const facts = getSalesFacts(storeId);
-    const todayKey = dateOnly(new Date().toISOString());
-    const salesToday = facts.filter((item) => dateOnly(item.createdAt) === todayKey);
+    const todayKey = brasiliaDateKey(new Date());
+    const salesToday = facts.filter((item) => brasiliaDateKey(item.createdAt) === todayKey);
     const openCreditClients = clients.filter((client) => client.fiado > 0);
     const lowStock = products.filter((product) => product.stock <= product.minStock);
     const expiring = products.filter((product) => product.expiry && daysUntil(product.expiry) <= 30);
@@ -2016,6 +2053,62 @@ function createStore() {
     }
   }
 
+  function deleteSale(storeId, id) {
+    const { db } = getStoreContext(storeId);
+    const sale = db.prepare(`
+      SELECT id, sale_number, client_id, payment_method, total, created_at
+      FROM sales
+      WHERE id = ?
+    `).get(id);
+
+    if (!sale) {
+      throw new Error("Venda nao encontrada.");
+    }
+
+    const items = db.prepare(`
+      SELECT product_id, quantity
+      FROM sale_items
+      WHERE sale_id = ?
+    `).all(id);
+
+    const timestampValue = nowIso();
+    db.exec("BEGIN");
+    try {
+      const restoreStock = db.prepare("UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?");
+      for (const item of items) {
+        restoreStock.run(Number(item.quantity), timestampValue, item.product_id);
+      }
+
+      db.prepare("DELETE FROM sales WHERE id = ?").run(id);
+
+      if (sale.client_id) {
+        const lastPurchase = db.prepare("SELECT MAX(created_at) AS last_purchase_at FROM sales WHERE client_id = ?").get(sale.client_id);
+        db.prepare(`
+          UPDATE clients
+          SET open_credit = CASE
+              WHEN ? = 'fiado' THEN MAX(0, open_credit - ?)
+              ELSE open_credit
+            END,
+            last_purchase_at = ?,
+            updated_at = ?
+          WHERE id = ?
+        `).run(
+          sale.payment_method,
+          Number(sale.total),
+          lastPurchase?.last_purchase_at ?? null,
+          timestampValue,
+          sale.client_id,
+        );
+      }
+
+      db.exec("COMMIT");
+      return { success: true, saleNumber: sale.sale_number };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   function login(username, password) {
     const row = authDb.prepare(`
       SELECT
@@ -2107,12 +2200,15 @@ function createStore() {
     getMessagesDashboard,
     listFiscalDocuments,
     getFiscalDocument,
+    getFiscalIssuer,
+    saveFiscalIssuer,
     getFiscalPrintSettings,
     saveFiscalPrintSettings,
     printFiscalDocumentDirect,
     saveMessageTemplate,
     sendDirectMessage,
     createSale,
+    deleteSale,
     login,
     logout,
     getUserFromToken,

@@ -3,7 +3,7 @@ import { DollarSign, ShoppingCart, TrendingUp, Users } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/service.js";
 import { Badge, Card, ErrorCard, KpiCard, LoadingCard, SectionHeader, Select, Table, Td } from "../components/ui.jsx";
-import { CAT_LABELS, C, catColor, fmt } from "../lib/designSystem.js";
+import { C, catColor, categoryLabel, fmt } from "../lib/designSystem.js";
 
 export function ReportsPage() {
   const [period, setPeriod] = useState("week");
@@ -173,7 +173,7 @@ export function ReportsPage() {
                 <span style={{ fontWeight: 500 }}>{product.name}</span>
                 <div style={{ fontSize: 11, color: C.textSec }}>{product.brand}</div>
               </Td>,
-              <Td key="category"><Badge label={CAT_LABELS[product.cat]} bg={categoryStyle.bg} text={categoryStyle.text} /></Td>,
+              <Td key="category"><Badge label={categoryLabel(product.cat)} bg={categoryStyle.bg} text={categoryStyle.text} /></Td>,
               <Td key="quantity">{product.quantity} {product.unit}</Td>,
               <Td key="revenue"><span style={{ fontWeight: 600 }}>{fmt(product.revenue)}</span></Td>,
               <Td key="margin"><span style={{ color: product.margin > 30 ? C.success : C.warning, fontWeight: 600 }}>{product.margin}%</span></Td>,

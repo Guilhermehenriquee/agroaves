@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, Printer, RefreshCw, Save, Server, Settings2 } from "lucide-react";
+import { Building2, CheckCircle, FileText, Printer, RefreshCw, Save, Server, Settings2, Trash2 } from "lucide-react";
 import { api } from "../api/service.js";
-import { Badge, Btn, Card, EmptyState, ErrorCard, LoadingCard, SectionHeader, Select, Table, Td } from "../components/ui.jsx";
-import { C, fmt, fmtDate } from "../lib/designSystem.js";
+import { Badge, Btn, Card, EmptyState, ErrorCard, Input, LoadingCard, SectionHeader, Select, Table, Td } from "../components/ui.jsx";
+import { C, fmt, fmtDateTime } from "../lib/designSystem.js";
 import { openFiscalPrint } from "../lib/fiscalPrint.js";
 
 const EMPTY_SETTINGS = {
@@ -12,13 +12,22 @@ const EMPTY_SETTINGS = {
   suggestedPrinter: "",
 };
 
-export function FiscalPage() {
+const EMPTY_ISSUER = {
+  name: "",
+  cnpj: "",
+  ie: "",
+  address: "",
+  city: "",
+};
+
+export function FiscalPage({ onDataChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [documents, setDocuments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [settings, setSettings] = useState(EMPTY_SETTINGS);
+  const [issuerForm, setIssuerForm] = useState(EMPTY_ISSUER);
   const [infoMessage, setInfoMessage] = useState("");
 
   useEffect(() => {
@@ -37,13 +46,15 @@ export function FiscalPage() {
   async function loadFiscal() {
     try {
       setLoading(true);
-      const [fiscalResult, settingsResult] = await Promise.all([
+      const [fiscalResult, settingsResult, issuerResult] = await Promise.all([
         api.getFiscalDocuments(),
         api.getFiscalPrintSettings(),
+        api.getFiscalIssuer(),
       ]);
       setDocuments(fiscalResult.documents);
       setSelectedId((current) => current ?? fiscalResult.documents[0]?.id ?? null);
       setSettings(settingsResult);
+      setIssuerForm(issuerResult.issuer ?? EMPTY_ISSUER);
       setError("");
       setInfoMessage("");
     } catch (currentError) {
@@ -98,6 +109,68 @@ export function FiscalPage() {
     }
   }
 
+  function updateIssuer(field, value) {
+    setIssuerForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function saveIssuer() {
+    try {
+      const result = await api.saveFiscalIssuer(issuerForm);
+      setIssuerForm(result.issuer);
+      if (selectedId) {
+        await loadDocument(selectedId);
+      }
+      setInfoMessage("Dados da nota fiscal salvos para as proximas impressoes.");
+      setError("");
+    } catch (currentError) {
+      setError(currentError.message);
+    }
+  }
+
+  async function openReceipt(documentId = selectedId) {
+    if (!documentId) {
+      return;
+    }
+
+    const receiptWindow = window.open("", "_blank", "width=480,height=760");
+    if (!receiptWindow) {
+      setError("O navegador bloqueou a abertura do comprovante.");
+      return;
+    }
+
+    try {
+      const document = selectedDocument?.id === documentId
+        ? selectedDocument
+        : (await api.getFiscalDocument(documentId)).document;
+      openFiscalPrint(document, receiptWindow, { autoPrint: false });
+    } catch (currentError) {
+      receiptWindow.close();
+      setError(currentError.message);
+    }
+  }
+
+  async function removeSale(document) {
+    if (!document) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Excluir a venda ${document.saleNumber}? O estoque sera devolvido e a nota sera removida.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const result = await api.deleteSale(document.saleId);
+      setSelectedId(null);
+      setSelectedDocument(null);
+      await loadFiscal();
+      onDataChanged?.();
+      setInfoMessage(`Venda ${result.saleNumber} excluida e estoque devolvido.`);
+    } catch (currentError) {
+      setError(currentError.message);
+    }
+  }
+
   if (loading) {
     return <LoadingCard label="Carregando modulo fiscal..." />;
   }
@@ -114,6 +187,7 @@ export function FiscalPage() {
         action={
           <div style={{ display: "flex", gap: 10 }}>
             <Btn variant="outline" icon={RefreshCw} onClick={loadFiscal}>Atualizar</Btn>
+            <Btn variant="outline" icon={FileText} onClick={() => openReceipt()} disabled={!selectedDocument}>Comprovante</Btn>
             <Btn variant="outline" icon={Printer} onClick={printBrowser} disabled={!selectedDocument}>Impressao Visual</Btn>
             <Btn icon={Server} onClick={printDirect} disabled={!selectedDocument}>Imprimir Direto</Btn>
           </div>
@@ -173,13 +247,39 @@ export function FiscalPage() {
         ) : null}
       </Card>
 
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <Building2 size={18} color={C.accent} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Dados da Nota Fiscal</div>
+            <div style={{ fontSize: 12, color: C.textSec }}>
+              Estes dados ficam salvos para comprovantes e futuras impressoes fiscais.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: "0 16px" }}>
+          <Input label="Nome da empresa *" value={issuerForm.name} onChange={(event) => updateIssuer("name", event.target.value)} />
+          <Input label="CNPJ" value={issuerForm.cnpj} onChange={(event) => updateIssuer("cnpj", event.target.value)} />
+          <Input label="IE" value={issuerForm.ie} onChange={(event) => updateIssuer("ie", event.target.value)} />
+          <div style={{ gridColumn: "1 / span 2" }}>
+            <Input label="Endereco" value={issuerForm.address} onChange={(event) => updateIssuer("address", event.target.value)} />
+          </div>
+          <Input label="Localidade" value={issuerForm.city} onChange={(event) => updateIssuer("city", event.target.value)} />
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Btn icon={Save} onClick={saveIssuer}>Salvar Dados Fiscais</Btn>
+        </div>
+      </Card>
+
       {documents.length === 0 ? (
         <EmptyState title="Nenhuma nota encontrada" description="Assim que uma venda for concluida no PDV, a nota fiscal interna aparecera aqui para reimpressao." />
       ) : (
         <>
           <Card style={{ marginBottom: 16 }}>
             <Table
-              headers={["Documento", "Venda", "Destinatario", "Tipo", "Total", "Emissao", "Impressao", ""]}
+              headers={["Documento", "Venda", "Destinatario", "Tipo", "Total", "Emissao", "Impressao", "Acoes"]}
               rows={documents.map((document) => [
                 <Td key="document">
                   <div style={{ fontWeight: 700, color: C.accent }}>{document.documentNumberDisplay}</div>
@@ -194,11 +294,11 @@ export function FiscalPage() {
                   <Badge label={document.documentTypeLabel} bg={document.documentType === "nfe" ? C.infoBg : C.successBg} text={document.documentType === "nfe" ? C.info : C.success} />
                 </Td>,
                 <Td key="total">{fmt(document.total)}</Td>,
-                <Td key="issued">{fmtDate(document.issuedAt)}</Td>,
+                <Td key="issued">{fmtDateTime(document.issuedAt)}</Td>,
                 <Td key="print">
                   {document.lastPrintedAt ? (
                     <div style={{ fontSize: 11, color: C.textSec }}>
-                      {fmtDate(document.lastPrintedAt)}
+                      {fmtDateTime(document.lastPrintedAt)}
                       <div>{document.printerName || "servidor local"}</div>
                     </div>
                   ) : document.printError ? (
@@ -208,9 +308,17 @@ export function FiscalPage() {
                   )}
                 </Td>,
                 <Td key="action">
-                  <Btn variant={selectedId === document.id ? "primary" : "outline"} size="sm" onClick={() => setSelectedId(document.id)}>
-                    Ver
-                  </Btn>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <Btn variant={selectedId === document.id ? "primary" : "outline"} size="sm" onClick={() => setSelectedId(document.id)}>
+                      Ver
+                    </Btn>
+                    <Btn variant="outline" size="sm" icon={FileText} onClick={() => openReceipt(document.id)}>
+                      Comprovante
+                    </Btn>
+                    <Btn variant="danger" size="sm" icon={Trash2} onClick={() => removeSale(document)}>
+                      Excluir
+                    </Btn>
+                  </div>
                 </Td>,
               ])}
             />
@@ -226,7 +334,7 @@ export function FiscalPage() {
                       {selectedDocument.documentTypeLabel} {selectedDocument.documentNumberDisplay}
                     </div>
                     <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>
-                      Venda {selectedDocument.saleNumber} · Serie {selectedDocument.series} · {fmtDate(selectedDocument.issuedAt)}
+                      Venda {selectedDocument.saleNumber} - Serie {selectedDocument.series} - {fmtDateTime(selectedDocument.issuedAt)}
                     </div>
                   </div>
 
@@ -248,9 +356,11 @@ export function FiscalPage() {
                         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 8, fontSize: 14 }}><span>TOTAL:</span><span>{fmt(selectedDocument.financial.total)}</span></div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "center" }}>
+                    <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                      <Btn icon={FileText} variant="outline" onClick={() => openReceipt(selectedDocument.id)}>Comprovante</Btn>
                       <Btn icon={Printer} variant="outline" onClick={printBrowser}>Impressao Visual</Btn>
                       <Btn icon={Server} onClick={printDirect}>Impressao Direta</Btn>
+                      <Btn icon={Trash2} variant="danger" onClick={() => removeSale(selectedDocument)}>Excluir Venda</Btn>
                     </div>
                   </div>
                 </>

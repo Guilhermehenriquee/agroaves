@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Banknote, Check, CheckCircle, CreditCard, Smartphone, User, X } from "lucide-react";
 import { api } from "../api/service.js";
 import { Badge, Btn, Card, ErrorCard, Input, LoadingCard, Modal, SearchField, SectionHeader, Select } from "../components/ui.jsx";
-import { CAT_LABELS, C, catColor, fmt, fmtQty } from "../lib/designSystem.js";
+import { CAT_LABELS, C, catColor, categoryLabel, fmt, fmtQty } from "../lib/designSystem.js";
 import { openFiscalPrint } from "../lib/fiscalPrint.js";
 
-const CATEGORY_OPTIONS = ["all", "racoes", "medicamentos", "aves", "utensilios"];
 const PRINT_OPTIONS = [
   { value: "true", label: "Sim, imprimir via" },
   { value: "false", label: "Nao imprimir agora" },
@@ -77,6 +76,16 @@ export function PdvPage({ onDataChanged }) {
       );
     });
   }, [category, products, search]);
+
+  const categoryOptions = useMemo(() => {
+    const values = new Set(["all", ...Object.keys(CAT_LABELS)]);
+    for (const product of products) {
+      if (product.cat) {
+        values.add(product.cat);
+      }
+    }
+    return [...values];
+  }, [products]);
 
   function getQuickValue(product) {
     return quickValues[product.id] ?? defaultQuickQuantity(product);
@@ -237,7 +246,7 @@ export function PdvPage({ onDataChanged }) {
               <SearchField value={search} onChange={setSearch} placeholder="Buscar ou ler codigo de barras..." />
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {CATEGORY_OPTIONS.map((current) => (
+              {categoryOptions.map((current) => (
                 <button
                   key={current}
                   onClick={() => setCategory(current)}
@@ -252,7 +261,7 @@ export function PdvPage({ onDataChanged }) {
                     fontWeight: category === current ? 600 : 400,
                   }}
                 >
-                  {current === "all" ? "Todos" : CAT_LABELS[current]}
+                  {current === "all" ? "Todos" : categoryLabel(current)}
                 </button>
               ))}
             </div>
@@ -282,7 +291,7 @@ export function PdvPage({ onDataChanged }) {
                     </div>
                   ) : null}
                   <div style={{ fontSize: 11, marginBottom: 2 }}>
-                    <Badge label={CAT_LABELS[product.cat]} bg={categoryStyle.bg} text={categoryStyle.text} />
+                    <Badge label={categoryLabel(product.cat)} bg={categoryStyle.bg} text={categoryStyle.text} />
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{product.name}</div>
                   <div style={{ fontSize: 11, color: C.textSec }}>{product.brand}</div>

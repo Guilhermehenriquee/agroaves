@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/service.js";
 import { Badge, Card, ErrorCard, LoadingCard, SearchField, SectionHeader, Td } from "../components/ui.jsx";
-import { CAT_LABELS, C, catColor, daysUntil, fmtDate, fmtQty } from "../lib/designSystem.js";
+import { C, catColor, categoryLabel, daysUntil, fmtDate, fmtQty } from "../lib/designSystem.js";
 
 export function StockPage() {
   const [state, setState] = useState({ loading: true, error: "", products: [] });
@@ -124,7 +124,7 @@ export function StockPage() {
                       <div style={{ fontSize: 11, color: C.textSec }}>{product.brand} · {product.supplier}</div>
                     </Td>
                     <Td>
-                      <Badge label={CAT_LABELS[product.cat]} bg={categoryStyle.bg} text={categoryStyle.text} />
+                      <Badge label={categoryLabel(product.cat)} bg={categoryStyle.bg} text={categoryStyle.text} />
                     </Td>
                     <Td>
                       <span style={{ fontWeight: 700, fontSize: 15 }}>{fmtQty(product.stock, product.unit)}</span>

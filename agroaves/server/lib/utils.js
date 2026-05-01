@@ -12,6 +12,7 @@ const CATEGORY_LABELS = {
   utensilios: "Utensilios",
 };
 
+const BRASILIA_TIME_ZONE = "America/Sao_Paulo";
 const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -23,12 +24,30 @@ export function dateOnly(value) {
   return value ? String(value).slice(0, 10) : null;
 }
 
+export function brasiliaDateKey(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRASILIA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+
+  const read = (type) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${read("year")}-${read("month")}-${read("day")}`;
+}
+
 export function formatDatePt(value) {
   if (!value) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRASILIA_TIME_ZONE,
+  }).format(new Date(value));
 }
 
 export function formatTimePt(value) {
@@ -37,6 +56,7 @@ export function formatTimePt(value) {
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRASILIA_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -54,7 +74,13 @@ export function daysUntil(value) {
 }
 
 export function categoryLabel(value) {
-  return CATEGORY_LABELS[value] ?? value;
+  if (!value) {
+    return "Sem categoria";
+  }
+
+  return CATEGORY_LABELS[value] ?? String(value)
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function paymentLabel(value) {
